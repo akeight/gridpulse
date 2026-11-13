@@ -147,3 +147,70 @@ Develop and improve a one-hour-ahead household electricity demand forecasting mo
 **Conclusion:** Ridge forecasting performance is relatively insensitive to regularization strength across the tested range. Further improvements may be more effectively pursued through feature engineering, peak demand analysis, or nonlinear modeling.
 
 **Next steps:** Evaluate performance on high-demand observations and analyze remaining forecasting weaknesses before finalizing the Ridge model.
+
+## E07 — Peak Demand and Residual Analysis
+
+**Objective:** Evaluate Ridge regression performance during high-demand periods and investigate remaining forecasting weaknesses before finalizing the model.
+
+### Top 10 Actual Demand Peaks
+
+| Model | MAE (kW) | RMSE (kW) | Underpredicted Peaks |
+|---|---|---|---|
+| Hourly Naive | 1.830477 | 2.178000 | 10/10 |
+| Ridge | 2.225080 | 2.355818 | 10/10 |
+| Daily Naive | 2.571140 | 2.814814 | 10/10 |
+| Weekly Naive | 3.050600 | 3.188024 | 10/10 |
+
+**Finding:** All models underestimated the ten highest actual demand observations. Hourly persistence outperformed Ridge on these extreme peaks, despite Ridge achieving substantially better overall validation accuracy.
+
+### Top 5% High-Demand Observations
+
+| Model | MAE (kW) | RMSE (kW) | Underprediction Rate |
+|---|---|---|---|
+| Ridge | 1.105884 | 1.308388 | 89.68% |
+| Hourly Naive | 1.139414 | 1.379434 | 78.87% |
+| Weekly Naive | 1.560551 | 1.842291 | 88.45% |
+| Daily Naive | 1.634815 | 1.904740 | 90.91% |
+
+**Finding:** Ridge outperformed all three naive baselines across the broader high-demand subset. However, Ridge underestimated high demand more frequently than hourly persistence and had a larger positive mean residual.
+
+### Residual Analysis
+
+Residuals were calculated as actual demand minus predicted demand. Positive residuals indicate underprediction, while negative residuals indicate overprediction.
+
+| Actual Demand Group | Mean Actual (kW) | Mean Predicted (kW) | Mean Residual (kW) |
+|---|---|---|---|
+| Very Low | 0.295046 | 0.472056 | -0.177010 |
+| Low | 0.402821 | 0.621750 | -0.218929 |
+| Medium | 0.835857 | 0.983286 | -0.147429 |
+| High | 1.458611 | 1.431805 | 0.026807 |
+| Very High | 2.425284 | 1.918907 | 0.506377 |
+
+**Overall mean residual:** -0.002078 kW.
+
+**Key findings:**
+
+- Ridge exhibits negligible overall mean prediction bias.
+- Conditional on actual demand, Ridge tends to overpredict low consumption and underpredict high consumption.
+- Residual variability increases across much of the predicted demand range, suggesting nonconstant error variance.
+- Extreme demand peaks remain difficult to forecast accurately.
+- The residual-versus-predicted-demand plot shows no obvious strong nonlinear mean pattern, although visual inspection alone cannot establish calibration.
+
+### Conclusion
+
+Ridge regression provides a strong linear forecasting benchmark. Feature engineering substantially improved overall accuracy, while hyperparameter tuning produced negligible additional gains.
+
+The model's primary remaining limitation is its reduced accuracy during extreme demand events. Ridge outperforms hourly persistence across the full validation dataset and the top 5% of actual demand observations, but hourly persistence performs better on the ten highest-demand observations.
+
+### Limitations
+
+- High-demand subsets were selected retrospectively using actual consumption. These results do not measure prospective peak detection or false alarm rates.
+- The dataset represents household electricity consumption rather than transformer-level load.
+- The observed error patterns do not establish that Ridge regularization is the primary cause of peak underprediction.
+- All reported results are based on the 2009 validation period. Final held-out test evaluation remains pending.
+
+### Decision
+
+Finalize Ridge as the selected linear forecasting candidate with alpha=1.0, one-hot hour encoding, weekend interactions, historical demand features, StandardScaler, and nonnegative prediction clipping.
+
+Retain the model as a benchmark for subsequent nonlinear forecasting experiments.

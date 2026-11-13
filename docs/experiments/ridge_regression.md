@@ -22,6 +22,7 @@ Develop and improve a one-hour-ahead household electricity demand forecasting mo
 | E03 — One-hot hour encoding         | 0.375341 |      0.536316 |
 | E04 — One-hot weekend interactions  | 0.370890 |      0.532393 |
 | E05 — Nonnegative clipping          | 0.370864 |      0.532377 |
+| E06 — Alpha tuning (retain 1.0) | 0.370864 | 0.532377 |
 
 ## E00 — Initial Ridge Regression Baseline
 
@@ -108,3 +109,41 @@ Develop and improve a one-hour-ahead household electricity demand forecasting mo
 - Ridge regularization strength (alpha)
 - Peak demand error analysis
 - Final model selection and held-out test evaluation
+
+## E06 — Ridge Hyperparameter Tuning
+
+**Objective:** Evaluate whether adjusting Ridge regularization strength improves forecasting accuracy and reduces physically invalid predictions.
+
+**Hypothesis:** Stronger regularization may improve generalization by shrinking coefficients, while weaker regularization may allow the model to capture demand patterns more accurately.
+
+**Experimental setup:**
+
+- Tested alpha values: 0.01, 0.1, 1.0, 10, 100, 1000.
+- Retained the existing one-hot hour encoding, weekend interactions, historical demand features, and StandardScaler.
+- Maintained identical training and validation splits.
+- Applied nonnegative clipping to all evaluated predictions.
+- Used MAE as the primary selection metric and RMSE as the secondary metric.
+
+**Results:**
+
+| Alpha | MAE (kW) | RMSE (kW) | Negative Raw Predictions |
+|---|---|---|---|
+| 0.01 | 0.370863 | 0.532380 | 7 |
+| 0.1 | 0.370863 | 0.532380 | 7 |
+| 1.0 | 0.370864 | 0.532377 | 7 |
+| 10 | 0.370868 | 0.532348 | 7 |
+| 100 | 0.370923 | 0.532073 | 6 |
+| 1000 | 0.372311 | 0.530780 | 0 |
+
+**Key findings:**
+
+- Validation performance remained nearly unchanged across alpha values from 0.01 to 100.
+- Alpha 1000 eliminated negative raw predictions and slightly improved RMSE but increased MAE.
+- Compared with alpha 1.0, alpha 1000 reduced RMSE by approximately 0.30% while increasing MAE by approximately 0.39%.
+- The performance improvements from previous feature engineering experiments were substantially larger than those observed during hyperparameter tuning.
+
+**Decision:** Retain alpha=1.0. Alternative regularization strengths did not provide a meaningful improvement in the primary evaluation metric. Nonnegative clipping remains in place to enforce valid final predictions.
+
+**Conclusion:** Ridge forecasting performance is relatively insensitive to regularization strength across the tested range. Further improvements may be more effectively pursued through feature engineering, peak demand analysis, or nonlinear modeling.
+
+**Next steps:** Evaluate performance on high-demand observations and analyze remaining forecasting weaknesses before finalizing the Ridge model.

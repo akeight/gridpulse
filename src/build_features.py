@@ -48,6 +48,7 @@ def build_features():
     # Historical demand features
     features["lag_24"] = power.shift(24)
     features["lag_168"] = power.shift(168)
+    features["lag_1"] = power.shift(1)
 
     # Leakage-safe historical rolling average
     features["rolling_mean_24"] = (

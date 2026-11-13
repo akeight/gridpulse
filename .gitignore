@@ -1,0 +1,16 @@
+# Python virtual environment
+gridpulse/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local environment variables
+.env
+
+# Project datasets
+data/raw/
+data/processed/
+
+# PyCharm IDE Config
+.idea/

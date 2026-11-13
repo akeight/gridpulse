@@ -1,0 +1,13 @@
+# Data processing
+pandas>=2.2,<3.0
+numpy>=1.26,<2.1
+pyarrow>=17
+
+# Data visualization
+matplotlib>=3.9,<3.10
+
+# Machine learning
+scikit-learn>=1.5,<1.7
+
+# Jupyter notebook development
+ipykernel>=6.29

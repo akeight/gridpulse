@@ -55,6 +55,11 @@ def build_features():
         power.shift(24).rolling(24).mean()
     )
 
+    # Recent 24-hour rolling average
+    features["rolling_mean_24_recent"] = (
+        power.shift(1).rolling(24).mean()
+    )
+
     return features
 
 

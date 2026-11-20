@@ -55,6 +55,21 @@ def build_features():
         power.shift(24).rolling(24).mean()
     )
 
+    # Recent 24-hour rolling average
+    features["rolling_mean_24_recent"] = (
+        power.shift(1).rolling(24).mean()
+    )
+
+    # Recent 3-hour rolling average
+    features["rolling_mean_3"] = (
+        power.shift(1).rolling(3).mean()
+    )
+
+    # Change in demand between the last two hours
+    features["demand_change_1h"] = (
+            power.shift(1) - power.shift(2)
+    )
+
     return features
 
 

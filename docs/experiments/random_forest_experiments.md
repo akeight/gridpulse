@@ -17,21 +17,23 @@ Develop and improve a one-hour-ahead household electricity demand forecasting mo
 
 ## Experiment Summary
 
-| Experiment | MAE (kW) | RMSE (kW) |
-|---|---:|---:|
-| E00 — Initial Random Forest (100 trees) | 0.368301 | 0.534288 |
-| E00 — Tree count tuning (250 trees) | 0.367176 | 0.532018 |
-| E01 — Maximum depth tuning (10) | 0.363694 | 0.529217 |
-| E02 — Minimum leaf size tuning (2; 500 trees) | 0.363130 | 0.528875 |
-| E03 — Selected configuration (250 trees) | 0.363227 | 0.528939 |
-| E04 — Peak and residual analysis (no model change) | 0.363227 | 0.528939 |
-| E05-A — Original rolling mean (matched control) | 0.364402 | 0.530837 |
-| E05-B — Recent rolling mean (replacement) | 0.363663 | 0.530372 |
-| E05-C — Both rolling means | 0.363424 | 0.529835 |
-| E05 — Decision: retain E03 | 0.363227 | 0.528939 |
+| Experiment                                                                    |   MAE (kW) | RMSE (kW) |
+|-------------------------------------------------------------------------------|-----------:|---:|
+| E00 — Initial Random Forest (100 trees)                                       |   0.368301 | 0.534288 |
+| E00 — Tree count tuning (250 trees)                                           |   0.367176 | 0.532018 |
+| E01 — Maximum depth tuning (10)                                               |   0.363694 | 0.529217 |
+| E02 — Minimum leaf size tuning (2; 500 trees)                                 |   0.363130 | 0.528875 |
+| E03 — Selected configuration (250 trees)                                      |   0.363227 | 0.528939 |
+| E04 — Peak and residual analysis (no model change)                            |   0.363227 | 0.528939 |
+| E05-A — Original rolling mean (matched control)                               |   0.364402 | 0.530837 |
+| E05-B — Recent rolling mean (replacement)                                     |   0.363663 | 0.530372 |
+| E05-C — Both rolling means                                                    |   0.363424 | 0.529835 |
+| E05 — Decision: retain E03                                                    |   0.363227 | 0.528939 |
 | E06 — Three-hour rolling mean | 0.359180 | 0.523998 |
-| E07 — Six-hour rolling mean | Pending | Pending |
+| E07 — Hourly demand change | 0.358958 | 0.523644 |
+| E08 — Selected Random Forest | 0.358958 | 0.523644 |
 
+---
 
 ## E00 — Initial Random Forest Baseline and Tree Count Tuning
 
@@ -55,6 +57,8 @@ Fixed seed 42; default depth and leaf settings. Validation results:
 
 Decision: 250 trees; diminishing returns beyond this point. 1000 was discussed but not tested in saved notebook. Training times were not recorded. Seed sensitivity was discussed but no saved sweep was found.
 
+---
+
 ## E01 — Maximum Depth Tuning
 
 **Hypothesis:** Limiting tree depth improves generalization by reducing overly specific splits.
@@ -71,6 +75,8 @@ Decision: 250 trees; diminishing returns beyond this point. 1000 was discussed b
 | 20 | 0.364184 | 0.530883 |
 
 Decision: depth 10 for lowest RMSE; depth 15 has slightly lower MAE. Duplicate fit call in loop should be removed.
+
+---
 
 ## E02 — Minimum Leaf Size Tuning
 
@@ -89,6 +95,8 @@ Decision: depth 10 for lowest RMSE; depth 15 has slightly lower MAE. Duplicate f
 
 Decision: leaf size 2; recheck at 250 trees. Remove duplicate fit call.
 
+---
+
 ## E03 — Selected Random Forest Configuration
 
 **Objective:** Evaluate the chosen combination of hyperparameters against naive baselines.
@@ -106,6 +114,8 @@ RandomForestRegressor(n_estimators=250, random_state=42,
 | Daily Naive | 0.609805 | 0.899521 |
 
 RF wins on 52.04% of individual observations versus hourly naive. No negative predictions; clipping has no effect. Prediction range 0.225250–4.308702; actual range 0.179733–5.233800. Overall mean residual −0.026330.
+
+---
 
 ## E04 — Peak Demand and Residual Analysis
 
@@ -150,6 +160,8 @@ Actual-demand quintile mean residuals (very low to very high): −0.193289, −0
 **Conclusion:** Random Forest improves overall and morning accuracy relative to the reported Ridge scores, but Ridge performs better on extreme demand. Confirm identical evaluation timestamps before attributing differences solely to model choice.
 
 **Decision:** Retain E03 as the current control; prioritize feature engineering before further tuning. Final test evaluation remains pending.
+
+---
 
 ## E05 — Recent Rolling Average
 
@@ -221,6 +233,8 @@ Top 5% of actual demand on the matched validation sample: threshold 2.73758 kW, 
 - The dataset represents household demand, not transformer-level load. One-hour-ahead forecasts update throughout the day; fixed 24-hour forecasts are a separate future task.
 - Repeated tuning on 2009 can overfit validation. Freeze model choices before held-out testing.
 
+---
+
 ## E06 — Three-Hour Rolling Average
 
 **Objective:** Determine whether recent household electricity consumption improves one-hour-ahead forecasting accuracy.
@@ -271,3 +285,138 @@ features["rolling_mean_3"] = (
 **Next experiment:** E07 — Hourly Demand Change.
 
 **Test-set status:** The 2010 test set remains held out from model selection.
+
+---
+
+## E07 — Hourly Demand Change
+
+**Objective:** Determine whether recent changes in electricity consumption improve one-hour-ahead forecasting beyond the information provided by historical lags and rolling averages.
+
+**Hypothesis:** Knowing whether demand increased or decreased between the two previous hours may help Random Forest capture short-term consumption dynamics.
+
+**Change:** Added `demand_change_1h`, calculated as the difference between the two most recent completed hourly observations.
+
+```python
+features["demand_change_1h"] = (
+    power.shift(1) - power.shift(2)
+)
+```
+
+**Experimental setup:**
+
+- E07-A: E06-B features, including `rolling_mean_3` (control).
+- E07-B: E06-B features plus `demand_change_1h`.
+- Both models trained and evaluated on identical eligible timestamps.
+- Random Forest configuration: `n_estimators=250`, `max_depth=10`, `min_samples_leaf=2`, `random_state=42`.
+- Validation period: 2009.
+- High-demand evaluation: Top 5% of actual demand.
+
+### Overall Validation Results
+
+| Model | MAE (kW) | RMSE (kW) |
+|---|---:|---:|
+| E07-A — Control | 0.359180 | 0.523998 |
+| E07-B — Demand Change | **0.358958** | **0.523644** |
+
+### High-Demand Results
+
+| Model | MAE (kW) | RMSE (kW) | Underprediction Rate |
+|---|---:|---:|---:|
+| E07-A — Control | 1.096234 | 1.305319 | 90.86% |
+| E07-B — Demand Change | **1.094564** | **1.300506** | 90.86% |
+| Hourly Naive | 1.135787 | 1.375485 | 78.52% |
+
+**Key findings:**
+
+- Adding `demand_change_1h` reduced overall MAE by approximately 0.06% and RMSE by approximately 0.07%.
+- High-demand MAE improved by approximately 0.15%.
+- High-demand underprediction frequency remained unchanged at 90.86%.
+- Improvements were considerably smaller than those observed when adding `rolling_mean_3`.
+- The new feature may provide overlapping information with existing recent consumption features.
+- The small gains may be sensitive to validation-period characteristics or random variation.
+
+**Decision:** Provisionally retain `demand_change_1h` in the selected Random Forest candidate, while recognizing that its additional predictive contribution is marginal.
+
+**Next experiment:** E08 — Final Random Forest Model Selection.
+
+---
+
+## E08 — Random Forest Model Selection
+
+**Objective:** Select a Random Forest configuration based on validation accuracy, high-demand forecasting performance, model complexity, and findings from previous experiments.
+
+### Selected Model
+
+**Model:** Random Forest Regressor
+
+**Hyperparameters:**
+
+```python
+rf_final = RandomForestRegressor(
+    n_estimators=250,
+    max_depth=10,
+    min_samples_leaf=2,
+    random_state=42
+)
+```
+
+**Selected input features:**
+
+- `hour`
+- `day_of_week`
+- `month`
+- `is_weekend`
+- `lag_1`
+- `lag_24`
+- `lag_168`
+- `rolling_mean_24`
+- `rolling_mean_3`
+- `demand_change_1h`
+
+The existing `encode_calendar()` transformation is applied before training.
+
+### Selected Candidate Results
+
+| Metric | E07-B |
+|---|---:|
+| Validation MAE | 0.358958 kW |
+| Validation RMSE | 0.523644 kW |
+| High-demand MAE | 1.094564 kW |
+| High-demand RMSE | 1.300506 kW |
+| High-demand underprediction rate | 90.86% |
+
+### Model Selection Findings
+
+- Random Forest improved overall forecasting accuracy compared with Ridge Regression and the naive baselines in earlier validation comparisons.
+- Adding the three-hour rolling average produced a consistent improvement in overall and high-demand forecasting.
+- Adding hourly demand change provided an additional but very small improvement.
+- Both Random Forest and Ridge Regression continued to struggle with extreme demand peaks.
+- Hourly persistence remained competitive during extreme-demand events.
+- Model performance improvements from additional features became progressively smaller.
+
+### Decision
+
+Select **E07-B** as the provisional final Random Forest candidate.
+
+Retain **E07-A** as a simpler alternative because removing `demand_change_1h` results in only a marginal increase in validation error.
+
+The selected model has not yet been evaluated on the held-out 2010 test dataset.
+
+### Limitations
+
+- The reported results are based on the 2009 validation period.
+- Multiple experiments were evaluated against the same validation dataset, creating some risk of validation overfitting.
+- High-demand observations were identified retrospectively using actual consumption values.
+- Improvements in high-demand MAE do not necessarily indicate improved prospective peak detection.
+- The dataset represents household electricity consumption rather than transformer-level demand.
+- The model continues to underestimate most high-demand observations.
+
+### Next Steps
+
+1. Preserve Random Forest E07-B as the selected validation candidate.
+2. Commit the final Random Forest notebook, feature builder, and experiment documentation.
+3. Develop an XGBoost forecasting model using the established chronological data splits.
+4. Compare selected Ridge, Random Forest, and XGBoost candidates.
+5. Conduct final evaluation on the untouched 2010 test period after model selection.
+
+**Conclusion:** Random Forest provides a strong nonlinear forecasting benchmark for GridPulse. Feature engineering produced incremental improvements, particularly through the three-hour rolling average. The selected model improves overall and high-demand forecasting accuracy but does not fully resolve extreme-demand underprediction.

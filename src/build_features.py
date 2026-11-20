@@ -65,6 +65,11 @@ def build_features():
         power.shift(1).rolling(3).mean()
     )
 
+    # Change in demand between the last two hours
+    features["demand_change_1h"] = (
+            power.shift(1) - power.shift(2)
+    )
+
     return features
 
 

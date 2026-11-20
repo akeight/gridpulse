@@ -29,9 +29,9 @@ Develop and improve a one-hour-ahead household electricity demand forecasting mo
 | E05-B — Recent rolling mean (replacement) | 0.363663 | 0.530372 |
 | E05-C — Both rolling means | 0.363424 | 0.529835 |
 | E05 — Decision: retain E03 | 0.363227 | 0.528939 |
-| E06 — Three-hour rolling mean | Pending | Pending |
+| E06 — Three-hour rolling mean | 0.359180 | 0.523998 |
 | E07 — Six-hour rolling mean | Pending | Pending |
-| E08 — Hourly demand change | Pending | Pending |
+
 
 ## E00 — Initial Random Forest Baseline and Tree Count Tuning
 
@@ -210,8 +210,6 @@ Top 5% of actual demand on the matched validation sample: threshold 2.73758 kW, 
 
 - E06 — Three-hour rolling mean: test `power.shift(1).rolling(3).mean()` against a matched E03 control.
 - E07 — Six-hour rolling mean: test `power.shift(1).rolling(6).mean()`; assess whether a longer short-term window provides useful context.
-- E08 — Hourly demand change: test `power.shift(1) - power.shift(2)` to represent the direction and magnitude of the latest observed change. Keep changes isolated and compare on matched timestamps.
-- Later: calendar feature ablation (full encoding, no explicit hour/weekend interactions, raw calendar features); no-rolling-mean ablation; peak-aware training using training-only thresholds and sample weights; recheck leaf size at 250 trees.
 - Final model selection and held-out 2010 test evaluation.
 
 ## Limitations and Reproducibility
@@ -222,3 +220,54 @@ Top 5% of actual demand on the matched validation sample: threshold 2.73758 kW, 
 - High-demand subsets are selected retrospectively; they do not measure prospective peak detection or false alarm rates.
 - The dataset represents household demand, not transformer-level load. One-hour-ahead forecasts update throughout the day; fixed 24-hour forecasts are a separate future task.
 - Repeated tuning on 2009 can overfit validation. Freeze model choices before held-out testing.
+
+## E06 — Three-Hour Rolling Average
+
+**Objective:** Determine whether recent household electricity consumption improves one-hour-ahead forecasting accuracy.
+
+**Hypothesis:** A three-hour rolling average provides useful information about recent demand patterns beyond the most recent hourly reading.
+
+**Change:** Added `rolling_mean_3`, calculated using the three most recent completed hourly observations.
+
+```python
+features["rolling_mean_3"] = (
+    power.shift(1).rolling(3).mean()
+)
+```
+
+**Experimental setup:**
+
+- E06-A: Original Random Forest features (control).
+- E06-B: Original features plus `rolling_mean_3`.
+- Both models trained and evaluated on identical eligible timestamps.
+- Random Forest configuration: 250 trees, maximum depth 10, minimum leaf size 2, random state 42.
+- Validation period: 2009.
+- High-demand threshold: 2.733877 kW (top 5%, 405 observations).
+
+**Overall validation results:**
+
+| Model | MAE (kW) | RMSE (kW) |
+|---|---:|---:|
+| E06-A — Control | 0.362005 | 0.527512 |
+| E06-B — Three-hour mean | **0.359180** | **0.523998** |
+
+**High-demand results:**
+
+| Model | MAE (kW) | RMSE (kW) | Underprediction rate |
+|---|---:|---:|---:|
+| E06-A | 1.102023 | 1.310357 | 90.12% |
+| E06-B | **1.096234** | **1.305319** | 90.86% |
+| Hourly Naive | 1.135787 | 1.375485 | 78.52% |
+
+**Key findings:**
+
+- Adding the three-hour rolling mean reduced overall MAE by approximately 0.78% and RMSE by 0.67%.
+- High-demand MAE improved by approximately 0.53%.
+- High-demand underprediction frequency increased slightly, despite smaller average prediction errors.
+- The shorter rolling window provided more useful predictive information than the additional 24-hour rolling window tested in E05, based on the respective within-experiment comparisons.
+
+**Decision:** Provisionally retain `rolling_mean_3` for Random Forest. Evaluate its contribution alongside the upcoming demand-change experiment before final model selection.
+
+**Next experiment:** E07 — Hourly Demand Change.
+
+**Test-set status:** The 2010 test set remains held out from model selection.
